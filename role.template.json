@@ -1,0 +1,67 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Transform": "AWS::LanguageExtensions",
+    "Parameters": {
+        "ExistingRole": {
+            "Type": "String",
+            "Description": "Existing LambdaBasicExecutionRole ARN",
+            "Default": ""
+        }
+    },
+    "Resources": {
+        "MyRole": {
+            "Condition": "CreateRole",
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "RoleName": "LambdaBasicExecutionRole",
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "lambda.amazonaws.com"
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+                ]
+            }
+        }
+    },
+    "Conditions": {
+        "CreateRole": {
+            "Fn::Equals": [
+                {
+                    "Ref": "ExistingRole"
+                },
+                ""
+            ]
+        }
+    },
+    "Outputs": {
+        "ExportedRole": {
+            "Description": "The ARN of the IAM role assumed by Lambda functions",
+            "Value": {
+                "Fn::If": [
+                    "CreateRole",
+                    {
+                        "Fn::GetAtt": [
+                            "MyRole",
+                            "Arn"
+                        ]
+                    },
+                    {
+                        "Ref": "ExistingRole"
+                    }
+                ]
+            },
+            "Export": {
+                "Name": "LambdaBasicExecutionRole"
+            }
+        }
+    }
+}

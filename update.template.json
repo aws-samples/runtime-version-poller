@@ -1,0 +1,157 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Resources": {
+        "MyFunction": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "FunctionName": "update",
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+                                "const { LambdaClient, ListFunctionsCommand, UpdateFunctionConfigurationCommand } = require(\"@aws-sdk/client-lambda\");",
+                                "const client = new LambdaClient({});",
+                                "",
+                                "const listFunctions = async (marker, listOfFunctions = []) => {",
+                                "    const input = {};",
+                                "    if (marker) {",
+                                "        input.Marker = marker;",
+                                "    };",
+                                "    const command = new ListFunctionsCommand(input);",
+                                "    const response = await client.send(command);",
+                                "    return response.NextMarker ? await listFunctions(response.NextMarker, listOfFunctions.concat(response.Functions)) : listOfFunctions.concat(response.Functions);",
+                                "}",
+                                "",
+                                "const updateFunction = async ({ FunctionName: functionName, Environment: environment }) => {",
+                                "    console.log(functionName);",
+                                "    const input = {",
+                                "        FunctionName: functionName,",
+                                "        Environment: {",
+                                "            Variables: {",
+                                "                ...environment?.Variables,",
+                                "                updatedAt: new Date().toString(),",
+                                "            },",
+                                "        }",
+                                "    };",
+                                "    const command = new UpdateFunctionConfigurationCommand(input);",
+                                "    await client.send(command);",
+                                "    console.log('Complete');",
+                                "    return;",
+                                "}",
+                                "",
+                                "const handler = async (event) => {",
+                                "    const functions = await listFunctions();",
+                                "    for await (const f of functions) {",
+                                "        console.log('Calling update');",
+                                "        await updateFunction(f);",
+                                "    }",
+                                "};",
+                                "",
+                                "module.exports = {",
+                                "    handler",
+                                "}"
+                            ]
+                        ]
+                    }
+                },
+                "Handler": "index.handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "MyRole",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "nodejs20.x",
+                "Timeout": 15,
+                "MemorySize": 1769
+            }
+        },
+        "MyLogGroup": {
+            "Type": "AWS::Logs::LogGroup",
+            "Properties": {
+                "LogGroupName": "/aws/lambda/update",
+                "RetentionInDays": 1
+            },
+            "UpdateReplacePolicy": "Delete",
+            "DeletionPolicy": "Delete"
+        },
+        "MyRule": {
+            "Type": "AWS::Events::Rule",
+            "Properties": {
+                "ScheduleExpression": "rate(1 hour)",
+                "State": "ENABLED",
+                "Targets": [
+                    {
+                        "Arn": {
+                            "Fn::GetAtt": [
+                                "MyFunction",
+                                "Arn"
+                            ]
+                        },
+                        "Id": {
+                            "Ref": "MyFunction"
+                        }
+                    }
+                ]
+            }
+        },
+        "MyPermission": {
+            "Type": "AWS::Lambda::Permission",
+            "Properties": {
+                "Action": "lambda:InvokeFunction",
+                "FunctionName": {
+                    "Fn::GetAtt": [
+                        "MyFunction",
+                        "Arn"
+                    ]
+                },
+                "Principal": "events.amazonaws.com",
+                "SourceArn": {
+                    "Fn::GetAtt": [
+                        "MyRule",
+                        "Arn"
+                    ]
+                }
+            }
+        },
+        "MyRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "lambda.amazonaws.com"
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+                ],
+                "Policies": [
+                    {
+                        "PolicyName": "UpdateFunction",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "lambda:ListFunctions",
+                                        "lambda:UpdateFunctionConfiguration"
+                                    ],
+                                    "Resource": "*"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    }
+}

@@ -1,0 +1,371 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Resources": {
+        "MyLogGroup": {
+            "Type": "AWS::Logs::LogGroup",
+            "Properties": {
+                "LogGroupName": {
+                    "Fn::Sub": "/aws/lambda/target"
+                },
+                "RetentionInDays": 1
+            },
+            "UpdateReplacePolicy": "Delete",
+            "DeletionPolicy": "Delete"
+        },
+        "MyLambdaRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+                ],
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "lambda.amazonaws.com"
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "Policies": [
+                    {
+                        "PolicyName": "DynamoDBAccessPolicy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "dynamodb:GetItem",
+                                        "dynamodb:PutItem",
+                                        "dynamodb:UpdateItem",
+                                        "dynamodb:DeleteItem",
+                                        "dynamodb:Scan",
+                                        "dynamodb:Query"
+                                    ],
+                                    "Resource": {
+                                        "Fn::GetAtt": [
+                                            "MyDynamoDBTable",
+                                            "Arn"
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "MyFunction": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "FunctionName": "target",
+                "Code": {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+                                "const zlib = require('zlib');",
+                                "const { promisify } = require('util');",
+                                "const { DynamoDBClient, PutItemCommand, ConditionalCheckFailedException } = require(\"@aws-sdk/client-dynamodb\");",
+                                "const client = new DynamoDBClient();",
+                                "",
+                                "const {",
+                                "    TABLE_NAME: TableName",
+                                "} = process.env;",
+                                "",
+                                "const gunzip = promisify(zlib.gunzip);",
+                                "",
+                                "// A Map of INIT_START runtimes to CloudFormation runtime strings",
+                                "const runtimeMap = new Map([",
+                                "    ['nodejs:14', 'nodejs14.x'],",
+                                "    ['dotnet:6', 'dotnet6'],",
+                                "    ['dotnet:8', 'dotnet8'],",
+                                "    ['java:11', 'java11'],",
+                                "    ['java:12', 'java12'],",
+                                "    ['java:17', 'java17'],",
+                                "    ['java:21', 'java21'],",
+                                "    ['nodejs:16', 'nodejs16.x'],",
+                                "    ['nodejs:18', 'nodejs18.x'],",
+                                "    ['nodejs:20', 'nodejs20.x'],",
+                                "    ['python:3.12', 'python3.12'],",
+                                "    ['ruby:3.3', 'ruby3.3'],",
+                                "    ['provided:al2023', 'provided.al2023'],",
+                                "]);",
+                                "",
+                                "const handler = async (event) => {",
+                                "    try {",
+                                "        console.log(event);",
+                                "        const payload = Buffer.from(event.awslogs.data, 'base64');",
+                                "        const unzip = await gunzip(payload);",
+                                "        const {",
+                                "            logEvents,",
+                                "            logGroup",
+                                "        } = JSON.parse(unzip.toString());",
+                                "        const message = logEvents[0].message;",
+                                "        const runtimeVersion = message.match(/Runtime Version: (.*?)\\t/)[1];",
+                                "        const runtimeVersionArn = message.match(/Runtime Version ARN: (.*?)\\n/)[1];",
+                                "        const runtime = runtimeMap.get(runtimeVersion.split('.v')[0]);",
+                                "        const patch = runtimeVersion.split('.v')[1];",
+                                "        const arch = logGroup.split('_')[1];",
+                                "        const region = runtimeVersionArn.split(':')[3];",
+                                "        const input = {",
+                                "            TableName,",
+                                "            Item: {",
+                                "                pk: {",
+                                "                    S: `${runtime}_${arch}_${region}`,",
+                                "                },",
+                                "                sk: {",
+                                "                    S: patch,",
+                                "                },",
+                                "                runtimeVersion: {",
+                                "                    S: runtimeVersion",
+                                "                },",
+                                "                runtimeVersionArn: {",
+                                "                    S: runtimeVersionArn",
+                                "                },",
+                                "                runtime: {",
+                                "                    S: runtime",
+                                "                },",
+                                "                patch: {",
+                                "                    S: patch",
+                                "                },",
+                                "                arch: {",
+                                "                    S: arch",
+                                "                },",
+                                "                region: {",
+                                "                    S: region",
+                                "                },",
+                                "                timestamp: {",
+                                "                    S: new Date().toISOString()",
+                                "                }",
+                                "            },",
+                                "            ConditionExpression: 'attribute_not_exists(pk) AND attribute_not_exists(sk)'",
+                                "        };",
+                                "        const command = new PutItemCommand(input);",
+                                "        await client.send(command);",
+                                "    }",
+                                "    catch (e) {",
+                                "        if (e instanceof ConditionalCheckFailedException) {",
+                                "            // Safe to ignore",
+                                "        }",
+                                "        else {",
+                                "            throw e;",
+                                "        }",
+                                "    }",
+                                "};",
+                                "",
+                                "module.exports = {",
+                                "    handler",
+                                "};"
+                            ]
+                        ]
+                    }
+                },
+                "Handler": "index.handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "MyLambdaRole",
+                        "Arn"
+                    ]
+                },
+                "Runtime": "nodejs20.x",
+                "Environment": {
+                    "Variables": {
+                        "TABLE_NAME": {
+                            "Ref": "MyDynamoDBTable"
+                        }
+                    }
+                },
+                "Timeout": 15,
+                "MemorySize": 1769
+            }
+        },
+        "MyPermission": {
+            "Type": "AWS::Lambda::Permission",
+            "DependsOn": "MyFunction",
+            "Properties": {
+                "Action": "lambda:InvokeFunction",
+                "FunctionName": {
+                    "Fn::GetAtt": [
+                        "MyFunction",
+                        "Arn"
+                    ]
+                },
+                "Principal": "logs.amazonaws.com",
+                "SourceAccount": {
+                    "Ref": "AWS::AccountId"
+                }
+            }
+        },
+        "MyDynamoDBTable": {
+            "Type": "AWS::DynamoDB::Table",
+            "Properties": {
+                "AttributeDefinitions": [
+                    {
+                        "AttributeName": "pk",
+                        "AttributeType": "S"
+                    },
+                    {
+                        "AttributeName": "sk",
+                        "AttributeType": "S"
+                    }
+                ],
+                "KeySchema": [
+                    {
+                        "AttributeName": "pk",
+                        "KeyType": "HASH"
+                    },
+                    {
+                        "AttributeName": "sk",
+                        "KeyType": "RANGE"
+                    }
+                ],
+                "BillingMode": "PAY_PER_REQUEST",
+                "StreamSpecification": {
+                    "StreamViewType": "NEW_AND_OLD_IMAGES"
+                }
+            }
+        },
+        "MySNSTopic": {
+            "Type": "AWS::SNS::Topic",
+            "Properties": {
+                "TopicName": "RuntimeVersionsTopic"
+            }
+        },
+        "MyPipesRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "pipes.amazonaws.com"
+                            },
+                            "Action": "sts:AssumeRole",
+                            "Condition": {
+                                "StringEquals": {
+                                    "aws:SourceArn": {
+                                        "Fn::Sub": "arn:${AWS::Partition}:pipes:${AWS::Region}:${AWS::AccountId}:pipe/pipe"
+                                    },
+                                    "aws:SourceAccount": {
+                                        "Fn::Sub": "${AWS::AccountId}"
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "Policies": [
+                    {
+                        "PolicyName": "DynamoDBStreamAccessPolicy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "dynamodb:DescribeStream",
+                                        "dynamodb:GetRecords",
+                                        "dynamodb:GetShardIterator",
+                                        "dynamodb:ListStreams"
+                                    ],
+                                    "Resource": [
+                                        {
+                                            "Fn::GetAtt": [
+                                                "MyDynamoDBTable",
+                                                "StreamArn"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "PolicyName": "PublishToSnsTopicPolicy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "sns:Publish"
+                                    ],
+                                    "Resource": [
+                                        {
+                                            "Fn::Sub": "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:RuntimeVersionsTopic"
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "MyPipeLogGroup": {
+            "Type": "AWS::Logs::LogGroup",
+            "Properties": {
+                "LogGroupName": "/aws/vendedlogs/pipes/pipe",
+                "RetentionInDays": 1
+            },
+            "UpdateReplacePolicy": "Delete",
+            "DeletionPolicy": "Delete"
+        },
+        "MyEventBridgePipe": {
+            "Type": "AWS::Pipes::Pipe",
+            "Properties": {
+                "RoleArn": {
+                    "Fn::GetAtt": [
+                        "MyPipesRole",
+                        "Arn"
+                    ]
+                },
+                "Name": "pipe",
+                "DesiredState": "RUNNING",
+                "Source": {
+                    "Fn::GetAtt": [
+                        "MyDynamoDBTable",
+                        "StreamArn"
+                    ]
+                },
+                "SourceParameters": {
+                    "DynamoDBStreamParameters": {
+                        "BatchSize": 1,
+                        "StartingPosition": "LATEST"
+                    },
+                    "FilterCriteria": {
+                        "Filters": [
+                            {
+                                "Pattern": "{\"eventName\":[\"INSERT\"]}"
+                            }
+                        ]
+                    }
+                },
+                "LogConfiguration": {
+                    "CloudwatchLogsLogDestination": {
+                        "LogGroupArn": {
+                            "Fn::GetAtt": [
+                                "MyPipeLogGroup",
+                                "Arn"
+                            ]
+                        }
+                    },
+                    "Level": "ERROR"
+                },
+                "TargetParameters": {
+                    "InputTemplate": "{\n  \"runtime\": <$.dynamodb.NewImage.runtime.S>,\n  \"arch\": <$.dynamodb.NewImage.arch.S>,\n  \"patch\": <$.dynamodb.NewImage.patch.S>,\n  \"runtimeVersion\": <$.dynamodb.NewImage.runtimeVersion.S>,\n  \"region\": <$.dynamodb.NewImage.region.S>,\n  \"runtimeVersionArn\": <$.dynamodb.NewImage.runtimeVersionArn.S>,\n  \"timestamp\": <$.dynamodb.NewImage.timestamp.S>\n}"
+                },
+                "Target": {
+                    "Ref": "MySNSTopic"
+                }
+            }
+        }
+    }
+}

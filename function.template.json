@@ -1,0 +1,253 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Parameters": {
+        "MyRuntimeParameter": {
+            "Type": "String",
+            "Description": "Lambda runtime",
+            "AllowedValues": [
+                "dotnet6",
+                "dotnet8",
+                "java11",
+                "java17",
+                "java21",
+                "nodejs16.x",
+                "nodejs18.x",
+                "nodejs20.x",
+                "python3.12",
+                "ruby3.3",
+                "provided.al2023",
+                ""
+            ]
+        },
+        "MyFunctionParameter": {
+            "Type": "String",
+            "Description": "Function name",
+            "Default": ""
+        },
+        "MyBucketParameter": {
+            "Type": "String",
+            "Description": "Bucket prefix",
+            "Default": ""
+        },
+        "MyRoleParameter": {
+            "Type": "String",
+            "Description": "Role to attach to the Lambda function",
+            "Default": ""
+        },
+        "MyArchitectureParameter": {
+            "Type": "String",
+            "Description": "Lambda architecture",
+            "AllowedValues": [
+                "arm64",
+                "x86_64",
+                ""
+            ]
+        }
+    },
+    "Resources": {
+        "MyFunction": {
+            "Type": "AWS::Lambda::Function",
+            "Condition": "CreateFunction",
+            "Properties": {
+                "FunctionName": {
+                    "Fn::Join": [
+                        "",
+                        {
+                            "Fn::Split": [
+                                ".",
+                                {
+                                    "Fn::Sub": "${MyRuntimeParameter}_${MyArchitectureParameter}"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "Code": {
+                    "S3Bucket": {
+                        "Fn::Sub": "${MyBucketParameter}-${AWS::Region}"
+                    },
+                    "S3Key": {
+                        "Fn::Sub": "${MyRuntimeParameter}_${MyArchitectureParameter}.zip"
+                    }
+                },
+                "Handler": {
+                    "Fn::FindInMap": [
+                        "RuntimeToHandler",
+                        {
+                            "Ref": "MyRuntimeParameter"
+                        },
+                        "Handler"
+                    ]
+                },
+                "Role": {
+                    "Fn::If": [
+                        "UseExportedRole",
+                        {
+                            "Fn::ImportValue": "LambdaBasicExecutionRole"
+                        },
+                        {
+                            "Ref": "MyRoleParameter"
+                        }
+                    ]
+                },
+                "Runtime": {
+                    "Ref": "MyRuntimeParameter"
+                },
+                "Architectures": [
+                    {
+                        "Ref": "MyArchitectureParameter"
+                    }
+                ]
+            }
+        },
+        "MyLogGroup": {
+            "Type": "AWS::Logs::LogGroup",
+            "Properties": {
+                "LogGroupName": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            "/aws/lambda/",
+                            {
+                                "Fn::If": [
+                                    "CreateFunction",
+                                    {
+                                        "Ref": "MyFunction"
+                                    },
+                                    {
+                                        "Ref": "MyFunctionParameter"
+                                    }
+                                ]
+                            }
+                        ]
+                    ]
+                },
+                "RetentionInDays": 1
+            },
+            "UpdateReplacePolicy": "Delete",
+            "DeletionPolicy": "Delete"
+        },
+        "MyRule": {
+            "Type": "AWS::Events::Rule",
+            "Properties": {
+                "ScheduleExpression": "rate(1 hour)",
+                "State": "ENABLED",
+                "Targets": [
+                    {
+                        "Arn": {
+                            "Fn::If": [
+                                "CreateFunction",
+                                {
+                                    "Fn::GetAtt": [
+                                        "MyFunction",
+                                        "Arn"
+                                    ]
+                                },
+                                {
+                                    "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${MyFunctionParameter}"
+                                }
+                            ]
+                        },
+                        "Id": {
+                            "Fn::If": [
+                                "CreateFunction",
+                                {
+                                    "Ref": "MyFunction"
+                                },
+                                {
+                                    "Ref": "MyFunctionParameter"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "MyPermission": {
+            "Type": "AWS::Lambda::Permission",
+            "Properties": {
+                "Action": "lambda:InvokeFunction",
+                "FunctionName": {
+                    "Fn::If": [
+                        "CreateFunction",
+                        {
+                            "Fn::GetAtt": [
+                                "MyFunction",
+                                "Arn"
+                            ]
+                        },
+                        {
+                            "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${MyFunctionParameter}"
+                        }
+                    ]
+                },
+                "Principal": "events.amazonaws.com",
+                "SourceArn": {
+                    "Fn::GetAtt": [
+                        "MyRule",
+                        "Arn"
+                    ]
+                }
+            }
+        }
+    },
+    "Mappings": {
+        "RuntimeToHandler": {
+            "dotnet6": {
+                "Handler": "LambdaTest::LambdaTest.LambdaHandler::handleRequest"
+            },
+            "dotnet8": {
+                "Handler": "LambdaTest::LambdaTest.LambdaHandler::handleRequest"
+            },
+            "java11": {
+                "Handler": "example.Hello::handleRequest"
+            },
+            "java17": {
+                "Handler": "example.Hello::handleRequest"
+            },
+            "java21": {
+                "Handler": "example.Hello::handleRequest"
+            },
+            "nodejs16.x": {
+                "Handler": "index.handler"
+            },
+            "nodejs18.x": {
+                "Handler": "index.handler"
+            },
+            "nodejs20.x": {
+                "Handler": "index.handler"
+            },
+            "python3.12": {
+                "Handler": "lambda_function.lambda_handler"
+            },
+            "ruby3.3": {
+                "Handler": "lambda_function.lambda_handler"
+            },
+            "provided.al2023": {
+                "Handler": "hello.handler"
+            }
+        }
+    },
+    "Conditions": {
+        "CreateFunction": {
+            "Fn::Not": [
+                {
+                    "Fn::Equals": [
+                        "",
+                        {
+                            "Ref": "MyBucketParameter"
+                        }
+                    ]
+                }
+            ]
+        },
+        "UseExportedRole": {
+            "Fn::Equals": [
+                "",
+                {
+                    "Ref": "MyRoleParameter"
+                }
+            ]
+        }
+    }
+}

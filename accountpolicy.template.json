@@ -1,0 +1,25 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Transform": "AWS::LanguageExtensions",
+    "Resources": {
+        "MyAccountPolicy": {
+            "Type": "AWS::Logs::AccountPolicy",
+            "Properties": {
+                "PolicyDocument": {
+                    "Fn::ToJsonString": {
+                        "DestinationArn": {
+                            "Fn::Sub": "arn:aws:lambda:us-east-1:${AWS::AccountId}:function:target"
+                        },
+                        "FilterPattern": "INIT_START"
+                    }
+                },
+                "PolicyName": "AccountPolicy",
+                "PolicyType": "SUBSCRIPTION_FILTER_POLICY",
+                "Scope": "ALL",
+                "SelectionCriteria": {
+                    "Fn::Sub": "LogGroupName NOT IN [\"/aws/lambda/target\",\"/aws/lambda/update\"]"
+                }
+            }
+        }
+    }
+}
