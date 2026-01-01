@@ -1,5 +1,81 @@
 {
     "AWSTemplateFormatVersion": "2010-09-09",
+    "Mappings": {
+        "RuntimeToHandler": {
+            "dotnet6": {
+                "Handler": "LambdaTest::LambdaTest.LambdaHandler::handleRequest"
+            },
+            "dotnet8": {
+                "Handler": "LambdaTest::LambdaTest.LambdaHandler::handleRequest"
+            },
+            "java8.al2": {
+                "Handler": "example.Hello::handleRequest"
+            },
+            "java11": {
+                "Handler": "example.Hello::handleRequest"
+            },
+            "java17": {
+                "Handler": "example.Hello::handleRequest"
+            },
+            "java21": {
+                "Handler": "example.Hello::handleRequest"
+            },
+            "java25": {
+                "Handler": "example.Hello::handleRequest"
+            },
+            "nodejs16.x": {
+                "Handler": "index.handler"
+            },
+            "nodejs18.x": {
+                "Handler": "index.handler"
+            },
+            "nodejs20.x": {
+                "Handler": "index.handler"
+            },
+            "nodejs22.x": {
+                "Handler": "index.handler"
+            },
+            "nodejs24.x": {
+                "Handler": "index.handler"
+            },
+            "python3.8": {
+                "Handler": "lambda_function.lambda_handler"
+            },
+            "python3.9": {
+                "Handler": "lambda_function.lambda_handler"
+            },
+            "python3.10": {
+                "Handler": "lambda_function.lambda_handler"
+            },
+            "python3.11": {
+                "Handler": "lambda_function.lambda_handler"
+            },
+            "python3.12": {
+                "Handler": "lambda_function.lambda_handler"
+            },
+            "python3.13": {
+                "Handler": "lambda_function.lambda_handler"
+            },
+            "python3.14": {
+                "Handler": "lambda_function.lambda_handler"
+            },
+            "ruby3.2": {
+                "Handler": "lambda_function.lambda_handler"
+            },
+            "ruby3.3": {
+                "Handler": "lambda_function.lambda_handler"
+            },
+            "ruby3.4": {
+                "Handler": "lambda_function.lambda_handler"
+            },
+            "provided.al2023": {
+                "Handler": "hello.handler"
+            },
+            "provided.al2": {
+                "Handler": "hello.handler"
+            }
+        }
+    },
     "Parameters": {
         "MyRuntimeParameter": {
             "Type": "String",
@@ -7,14 +83,27 @@
             "AllowedValues": [
                 "dotnet6",
                 "dotnet8",
+                "java8.al2",
                 "java11",
                 "java17",
                 "java21",
+                "java25",
                 "nodejs16.x",
                 "nodejs18.x",
                 "nodejs20.x",
+                "nodejs22.x",
+                "nodejs24.x",
+                "python3.8",
+                "python3.9",
+                "python3.10",
+                "python3.11",
                 "python3.12",
+                "python3.13",
+                "python3.14",
+                "ruby3.2",
                 "ruby3.3",
+                "ruby3.4",
+                "provided.al2",
                 "provided.al2023",
                 ""
             ]
@@ -188,43 +277,6 @@
                         "Arn"
                     ]
                 }
-            }
-        }
-    },
-    "Mappings": {
-        "RuntimeToHandler": {
-            "dotnet6": {
-                "Handler": "LambdaTest::LambdaTest.LambdaHandler::handleRequest"
-            },
-            "dotnet8": {
-                "Handler": "LambdaTest::LambdaTest.LambdaHandler::handleRequest"
-            },
-            "java11": {
-                "Handler": "example.Hello::handleRequest"
-            },
-            "java17": {
-                "Handler": "example.Hello::handleRequest"
-            },
-            "java21": {
-                "Handler": "example.Hello::handleRequest"
-            },
-            "nodejs16.x": {
-                "Handler": "index.handler"
-            },
-            "nodejs18.x": {
-                "Handler": "index.handler"
-            },
-            "nodejs20.x": {
-                "Handler": "index.handler"
-            },
-            "python3.12": {
-                "Handler": "lambda_function.lambda_handler"
-            },
-            "ruby3.3": {
-                "Handler": "lambda_function.lambda_handler"
-            },
-            "provided.al2023": {
-                "Handler": "hello.handler"
             }
         }
     },

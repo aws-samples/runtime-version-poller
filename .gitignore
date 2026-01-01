@@ -1,0 +1,10 @@
+# Ignore RSS project
+rss/
+# Ignore function binaries
+functions/
+# Ignore deployment scripts
+deploy/
+# Ignore KIRO files
+.kiro/
+.vscode
+.DS_store
