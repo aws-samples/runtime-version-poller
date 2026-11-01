@@ -120,7 +120,9 @@
                                 "        const message = logEvents[0].message;",
                                 "        const runtimeVersion = message.match(/Runtime Version: (.*?)\\t/)[1];",
                                 "        const runtimeVersionArn = message.match(/Runtime Version ARN: (.*?)\\n/)[1];",
-                                "        const runtime = runtimeMap.get(runtimeVersion.split('.v')[0]);",
+                                "        // INIT_START may add a track name after the runtime, e.g. python:3.12.mainlinev2.v82",
+                                "        const runtimeKey = [...runtimeMap.keys()].find((k) => runtimeVersion.startsWith(`${k}.`));",
+                                "        const runtime = runtimeMap.get(runtimeKey);",
                                 "        const patch = runtimeVersion.split('.v')[1];",
                                 "        const arch = logGroup.split('_')[1];",
                                 "        const region = runtimeVersionArn.split(':')[3];",
@@ -231,7 +233,6 @@
                 "eu-central-2",
                 "il-central-1",
                 "mx-central-1",
-                "me-south-1",
                 "me-central-1"
             ],
             {
@@ -420,6 +421,16 @@
                 "Target": {
                     "Ref": "MySNSTopic"
                 }
+            }
+        }
+    },
+    "Outputs": {
+        "TargetFunctionName": {
+            "Value": {
+                "Ref": "MyFunction"
+            },
+            "Export": {
+                "Name": "RuntimePoller-TargetFunctionName"
             }
         }
     }

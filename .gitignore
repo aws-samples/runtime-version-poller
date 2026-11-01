@@ -8,3 +8,5 @@ deploy/
 .kiro/
 .vscode
 .DS_store
+# Ignore Claude files
+.claude/

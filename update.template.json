@@ -41,7 +41,7 @@
                                 "}",
                                 "",
                                 "const handler = async (event) => {",
-                                "    const functions = await listFunctions();",
+                                "    const functions = (await listFunctions()).filter(({ FunctionName: functionName }) => functionName !== process.env.AWS_LAMBDA_FUNCTION_NAME);",
                                 "    for await (const f of functions) {",
                                 "        console.log('Calling update');",
                                 "        await updateFunction(f);",
@@ -63,7 +63,7 @@
                     ]
                 },
                 "Runtime": "nodejs20.x",
-                "Timeout": 15,
+                "Timeout": 30,
                 "MemorySize": 1769
             }
         },
@@ -151,6 +151,16 @@
                         }
                     }
                 ]
+            }
+        }
+    },
+    "Outputs": {
+        "UpdateFunctionName": {
+            "Value": {
+                "Ref": "MyFunction"
+            },
+            "Export": {
+                "Name": "RuntimePoller-UpdateFunctionName"
             }
         }
     }
