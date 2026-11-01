@@ -8,3 +8,6 @@ deploy/
 .kiro/
 .vscode
 .DS_store
+# Local agent scratch
+.claude/decision-log/
+.claude/.docs-checked
