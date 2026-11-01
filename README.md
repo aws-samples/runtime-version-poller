@@ -49,18 +49,13 @@ The following runtime and architecture combinations are currently supported by t
 
 ### Region Support
 
-This solution supports deployment to most AWS regions. However, the Account Policy CloudFormation resource (`AWS::Logs::AccountPolicy`) is not available in all regions.
+This solution supports deployment to all commercial AWS regions except those listed under Unavailable Regions below. It relies on the Account Policy CloudFormation resource (`AWS::Logs::AccountPolicy`), which can reach a new region some time after the region launches. Before deploying to a new region, check that it is available with `aws cloudformation describe-type --type RESOURCE --type-name AWS::Logs::AccountPolicy --region <region>`.
 
-#### Regions with Limited Support (4 regions)
+#### Unavailable Regions
 
-The following regions do not support the Account Policy CloudFormation resource and require alternative deployment approaches:
+- **me-south-1** (Middle East - Bahrain) is not supported.
 
-- **ap-east-2** (Asia Pacific - Hong Kong SAR)
-- **mx-central-1** (North America - Mexico)
-- **ap-southeast-6** (Asia Pacific - Malaysia)
-- **ap-southeast-7** (Asia Pacific - Thailand)
-
-**Note**: For regions with limited support, you can still deploy the other components (role, target, function, update templates) but will need to configure log subscriptions manually or use alternative approaches instead of the Account Policy template.
+**Note**: In a region where `AWS::Logs::AccountPolicy` is not available, you can still deploy the other components (role, target, function, update templates) but will need to configure log subscriptions manually or use alternative approaches instead of the Account Policy template.
 
 ### Opt-in Region Support
 
@@ -78,7 +73,7 @@ Follow these steps to deploy the solution:
 
 4. **Deploy the Function CloudFormation Template**: In each region for every runtime and architecture, deploy the `function` CloudFormation template, which deploys a function, a log group (to limit log retention), and a CloudWatch Event to trigger the function hourly. The function template accepts either the name of an existing function or an S3 location of a Lambda deployment ZIP (e.g. create a blank function using the AWS console, download the deployment ZIP, and upload it to S3).
 
-5. **Deploy the Update CloudFormation Template**: In each region, deploy the `update` CloudFormation template, which updates each function in the region with a timestamp to ensure each function is part of the first phase of Lambda's runtime version updates.
+5. **Deploy the Update CloudFormation Template**: In each region, deploy the `update` CloudFormation template, which updates each other function in the region with a timestamp to ensure each function is part of the first phase of Lambda's runtime version updates.
 
 ### Handling Opt-in Regions During Deployment
 
