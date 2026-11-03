@@ -38,6 +38,9 @@
             "nodejs24.x": {
                 "Handler": "index.handler"
             },
+            "nodejs26.x": {
+                "Handler": "index.handler"
+            },
             "python3.8": {
                 "Handler": "lambda_function.lambda_handler"
             },
@@ -93,6 +96,7 @@
                 "nodejs20.x",
                 "nodejs22.x",
                 "nodejs24.x",
+                "nodejs26.x",
                 "python3.8",
                 "python3.9",
                 "python3.10",
