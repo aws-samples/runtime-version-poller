@@ -35,6 +35,7 @@ The following runtime and architecture combinations are currently supported by t
 | python3.12 | arm64, x86_64 | ✅ Supported |
 | python3.13 | arm64, x86_64 | ✅ Supported |
 | python3.14 | arm64, x86_64 | ✅ Supported |
+| python3.15 | arm64, x86_64 | 🧪 Preview |
 | ruby3.2 | arm64, x86_64 | ✅ Supported |
 | ruby3.3 | arm64, x86_64 | ✅ Supported |
 | ruby3.4 | arm64, x86_64 | ✅ Supported |
