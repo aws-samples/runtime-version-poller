@@ -18,9 +18,13 @@ The following runtime and architecture combinations are currently supported by t
 |---------|-------------|---------|
 | dotnet6 | arm64, x86_64 | ✅ Supported |
 | dotnet8 | arm64, x86_64 | ✅ Supported |
+| dotnet10 | arm64, x86_64 | ✅ Supported |
 | java8.al2 | arm64, x86_64 | ✅ Supported |
+| java8.al2023 | arm64, x86_64 | ✅ Supported |
 | java11 | arm64, x86_64 | ✅ Supported |
+| java11.al2023 | arm64, x86_64 | ✅ Supported |
 | java17 | arm64, x86_64 | ✅ Supported |
+| java17.al2023 | arm64, x86_64 | ✅ Supported |
 | java21 | arm64, x86_64 | ✅ Supported |
 | java25 | arm64, x86_64 | ✅ Supported |
 | nodejs16.x | arm64, x86_64 | ✅ Supported |
@@ -38,10 +42,13 @@ The following runtime and architecture combinations are currently supported by t
 | ruby3.2 | arm64, x86_64 | ✅ Supported |
 | ruby3.3 | arm64, x86_64 | ✅ Supported |
 | ruby3.4 | arm64, x86_64 | ✅ Supported |
+| ruby4.0 | arm64, x86_64 | ✅ Supported |
 | provided.al2 | arm64, x86_64 | ✅ Supported |
 | provided.al2023 | arm64, x86_64 | ✅ Supported |
 
 **Note**: All runtimes listed above are defined in the CloudFormation templates. For deployment, you can either create functions using the AWS console and provide the function name, or upload deployment packages to S3 and reference them in the template parameters.
+
+Runtimes that Lambda offers only as container images (for example `dotnet9`) are not included, because the functions are deployed as .zip packages.
 
 ## Deployment
 
@@ -54,6 +61,7 @@ This solution supports deployment to all commercial AWS regions except those lis
 #### Unavailable Regions
 
 - **me-south-1** (Middle East - Bahrain) is not supported.
+- **me-central-1** (Middle East - UAE) is not supported.
 
 **Note**: In a region where `AWS::Logs::AccountPolicy` is not available, you can still deploy the other components (role, target, function, update templates) but will need to configure log subscriptions manually or use alternative approaches instead of the Account Policy template.
 
