@@ -11,7 +11,26 @@
                             "\n",
                             [
                                 "const { LambdaClient, ListFunctionsCommand, UpdateFunctionConfigurationCommand } = require(\"@aws-sdk/client-lambda\");",
+                                "const { ResourceGroupsTaggingAPIClient, GetResourcesCommand } = require(\"@aws-sdk/client-resource-groups-tagging-api\");",
                                 "const client = new LambdaClient({});",
+                                "const tagging = new ResourceGroupsTaggingAPIClient({});",
+                                "",
+                                "// Only functions with this tag (any value) are updated. The function template tags the functions it creates.",
+                                "const TAG_KEY = 'runtime-version-poller';",
+                                "",
+                                "const listTaggedArns = async (token, arns = []) => {",
+                                "    const input = {",
+                                "        ResourceTypeFilters: ['lambda:function'],",
+                                "        TagFilters: [{ Key: TAG_KEY }],",
+                                "    };",
+                                "    if (token) {",
+                                "        input.PaginationToken = token;",
+                                "    };",
+                                "    const command = new GetResourcesCommand(input);",
+                                "    const response = await tagging.send(command);",
+                                "    const all = arns.concat(response.ResourceTagMappingList.map(({ ResourceARN: arn }) => arn));",
+                                "    return response.PaginationToken ? await listTaggedArns(response.PaginationToken, all) : all;",
+                                "}",
                                 "",
                                 "const listFunctions = async (marker, listOfFunctions = []) => {",
                                 "    const input = {};",
@@ -41,11 +60,13 @@
                                 "}",
                                 "",
                                 "const handler = async (event) => {",
-                                "    const functions = (await listFunctions()).filter(({ FunctionName: functionName }) => functionName !== process.env.AWS_LAMBDA_FUNCTION_NAME);",
+                                "    const tagged = new Set(await listTaggedArns());",
+                                "    const functions = (await listFunctions()).filter(({ FunctionArn: functionArn, FunctionName: functionName }) => tagged.has(functionArn) && functionName !== process.env.AWS_LAMBDA_FUNCTION_NAME);",
                                 "    for await (const f of functions) {",
                                 "        console.log('Calling update');",
                                 "        await updateFunction(f);",
                                 "    }",
+                                "    return { updated: functions.map(({ FunctionName: functionName }) => functionName) };",
                                 "};",
                                 "",
                                 "module.exports = {",
@@ -143,9 +164,21 @@
                                     "Effect": "Allow",
                                     "Action": [
                                         "lambda:ListFunctions",
-                                        "lambda:UpdateFunctionConfiguration"
+                                        "tag:GetResources"
                                     ],
                                     "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "lambda:UpdateFunctionConfiguration",
+                                    "Resource": {
+                                        "Fn::Sub": "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:*"
+                                    },
+                                    "Condition": {
+                                        "Null": {
+                                            "aws:ResourceTag/runtime-version-poller": "false"
+                                        }
+                                    }
                                 }
                             ]
                         }

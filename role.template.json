@@ -57,9 +57,6 @@
                         "Ref": "ExistingRole"
                     }
                 ]
-            },
-            "Export": {
-                "Name": "LambdaBasicExecutionRole"
             }
         }
     }
