@@ -138,10 +138,10 @@
             "Description": "Bucket prefix",
             "Default": ""
         },
-        "MyRoleParameter": {
+        "RoleStackName": {
             "Type": "String",
-            "Description": "Role to attach to the Lambda function",
-            "Default": ""
+            "Description": "Name of the role stack in us-east-1 whose ExportedRole output is the function's role",
+            "Default": "LambdaBasicExecutionRole"
         },
         "MyArchitectureParameter": {
             "Type": "String",
@@ -189,15 +189,13 @@
                     ]
                 },
                 "Role": {
-                    "Fn::If": [
-                        "UseExportedRole",
-                        {
-                            "Fn::ImportValue": "LambdaBasicExecutionRole"
+                    "Fn::GetStackOutput": {
+                        "StackName": {
+                            "Ref": "RoleStackName"
                         },
-                        {
-                            "Ref": "MyRoleParameter"
-                        }
-                    ]
+                        "OutputName": "ExportedRole",
+                        "Region": "us-east-1"
+                    }
                 },
                 "Runtime": {
                     "Ref": "MyRuntimeParameter"
@@ -205,6 +203,12 @@
                 "Architectures": [
                     {
                         "Ref": "MyArchitectureParameter"
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "runtime-version-poller",
+                        "Value": "function"
                     }
                 ]
             }
@@ -310,14 +314,6 @@
                             "Ref": "MyBucketParameter"
                         }
                     ]
-                }
-            ]
-        },
-        "UseExportedRole": {
-            "Fn::Equals": [
-                "",
-                {
-                    "Ref": "MyRoleParameter"
                 }
             ]
         }

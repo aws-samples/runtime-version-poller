@@ -62,6 +62,7 @@
         },
         "MyFunction": {
             "Type": "AWS::Lambda::Function",
+            "DependsOn": "MyEventBridgePipe",
             "Properties": {
                 "FunctionName": "target",
                 "Code": {
@@ -71,7 +72,7 @@
                             [
                                 "const zlib = require('zlib');",
                                 "const { promisify } = require('util');",
-                                "const { DynamoDBClient, PutItemCommand, ConditionalCheckFailedException } = require(\"@aws-sdk/client-dynamodb\");",
+                                "const { DynamoDBClient, GetItemCommand, PutItemCommand, ConditionalCheckFailedException } = require(\"@aws-sdk/client-dynamodb\");",
                                 "const client = new DynamoDBClient();",
                                 "",
                                 "const {",
@@ -131,13 +132,32 @@
                                 "        const runtimeKey = [...runtimeMap.keys()].find((k) => runtimeVersion.startsWith(`${k}.`));",
                                 "        const runtime = runtimeMap.get(runtimeKey);",
                                 "        const patch = runtimeVersion.split('.v')[1];",
-                                "        const arch = logGroup.split('_')[1];",
+                                "        // Function names are <runtime>_<arch>, and x86_64 has an underscore of its own",
+                                "        const arch = logGroup.split('_').slice(1).join('_');",
                                 "        const region = runtimeVersionArn.split(':')[3];",
+                                "        const pk = `${runtime}_${arch}_${region}`;",
+                                "        // v1 keyed x86_64 as x86. A version already stored under the v1 key is not new:",
+                                "        // copy that item instead, marked migratedFrom, which the pipe does not announce.",
+                                "        if (arch === 'x86_64') {",
+                                "            const legacyPk = `${runtime}_x86_${region}`;",
+                                "            const { Item: legacy } = await client.send(new GetItemCommand({",
+                                "                TableName,",
+                                "                Key: { pk: { S: legacyPk }, sk: { S: patch } },",
+                                "            }));",
+                                "            if (legacy) {",
+                                "                await client.send(new PutItemCommand({",
+                                "                    TableName,",
+                                "                    Item: { ...legacy, pk: { S: pk }, arch: { S: arch }, migratedFrom: { S: legacyPk } },",
+                                "                    ConditionExpression: 'attribute_not_exists(pk) AND attribute_not_exists(sk)'",
+                                "                }));",
+                                "                return;",
+                                "            }",
+                                "        }",
                                 "        const input = {",
                                 "            TableName,",
                                 "            Item: {",
                                 "                pk: {",
-                                "                    S: `${runtime}_${arch}_${region}`,",
+                                "                    S: pk,",
                                 "                },",
                                 "                sk: {",
                                 "                    S: patch,",
@@ -239,8 +259,7 @@
                 "eu-south-2",
                 "eu-central-2",
                 "il-central-1",
-                "mx-central-1",
-                "me-central-1"
+                "mx-central-1"
             ],
             {
                 "MyOptInPermission&{Region}": {
@@ -406,7 +425,7 @@
                     "FilterCriteria": {
                         "Filters": [
                             {
-                                "Pattern": "{\"eventName\":[\"INSERT\"]}"
+                                "Pattern": "{\"eventName\":[\"INSERT\"],\"dynamodb\":{\"NewImage\":{\"migratedFrom\":{\"S\":[{\"exists\":false}]}}}}"
                             }
                         ]
                     }
