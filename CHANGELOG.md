@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.0.1 (2026-11-06)
+
+- `target` ignores functions whose name does not end in `_x86_64` or `_arm64`. The account log policy sends it every function's `INIT_START`, and v2.0.0 stored a function with no `_` in its name under an empty arch (`<runtime>__<region>`) and announced it.
+- `target` no longer copies a version it holds under a v1 key; it writes nothing, and `migration/migrate-table.js` moves the item. A pipe keeps its old filter for a short while after an update, so a copy made just after step 3 of the upgrade could be announced.
+- `migration/migrate-table.js --apply` refuses to run until the pipe was last updated at least 5 minutes ago.
+- If you run v2.0.0, update the target stack. Then list any items whose `arch` is not `x86_64`, `arm64` or (v1, not yet migrated) `x86`, and delete them with `aws dynamodb delete-item`:
+
+  ```
+  aws dynamodb scan --table-name <table> --filter-expression "NOT (arch IN (:a, :b, :c))" --expression-attribute-values '{":a":{"S":"x86_64"},":b":{"S":"arm64"},":c":{"S":"x86"}}' --projection-expression "pk, sk" --region us-east-1
+  ```
+
 ## v2.0.0 (2026-11-05)
 
 Breaking changes. If you run v1, follow [Upgrading from v1](README.md#upgrading-from-v1) in the README, in order.
