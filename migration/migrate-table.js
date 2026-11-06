@@ -7,13 +7,15 @@
 //   node migration/migrate-table.js [--stack=target] [--region=us-east-1] [--table=<name>] [--profile=<name>] [--apply]
 //
 // Without --apply it changes nothing and prints the counts. --apply refuses to run until
-// the target stack is on v2 (its pipe filter skips `migratedFrom`), so copies never reach
-// SNS subscribers. Safe to run again: a second run finds nothing to do.
+// the target stack is on v2 (its pipe filter skips `migratedFrom`) and the pipe was last
+// updated at least 5 minutes ago, so copies never reach SNS subscribers. Safe to run
+// again: a second run finds nothing to do.
 const { opts, aws, pool, account, print } = require('./lib');
 
 const region = opts.region || 'us-east-1';
 const stack = opts.stack || 'target';
 const apply = Boolean(opts.apply);
+const MIN_PIPE_AGE_MINUTES = 5;
 
 // pk is `<runtime>_<arch>_<region>`; a region has no underscore. `python3.12_x86_64_us-east-1`
 // does not match (64_us-east-1 has one).
@@ -53,7 +55,7 @@ const actions = (table, item, copyExists) => {
 const transact = (items) => aws(region, ['dynamodb', 'transact-write-items', '--transact-items', JSON.stringify(items)], { json: false });
 
 // One item on its own, re-reading both keys first: used when a batch transaction was cancelled
-// (for example `target` copied one of its items a moment earlier).
+// (for example one of its items changed during the run).
 const moveOne = async (table, item) => {
     const get = (pk) => aws(region, ['dynamodb', 'get-item', '--table-name', table, '--consistent-read',
         '--key', JSON.stringify(key(pk, item.sk.S))]);
@@ -67,9 +69,13 @@ const moveOne = async (table, item) => {
 const main = async () => {
     const table = opts.table || await physicalId('MyDynamoDBTable');
     const pipeName = await physicalId('MyEventBridgePipe');
-    const { SourceParameters } = await aws(region, ['pipes', 'describe-pipe', '--name', pipeName]);
+    const { SourceParameters, LastModifiedTime } = await aws(region, ['pipes', 'describe-pipe', '--name', pipeName]);
     const filters = (SourceParameters?.FilterCriteria?.Filters || []).map((f) => f.Pattern);
     const pipeSkipsCopies = filters.length > 0 && filters.every((p) => p.includes('migratedFrom'));
+    // A pipe keeps using its old filter for a short while after an update (about 25 s in one test).
+    // The CLI prints ISO 8601, or epoch seconds if cli_timestamp_format is `none`.
+    const modified = typeof LastModifiedTime === 'number' ? LastModifiedTime * 1000 : Date.parse(LastModifiedTime);
+    const pipeAgeMinutes = Math.floor((Date.now() - modified) / 60000);
 
     const items = await scan(table);
     const present = new Set(items.map((i) => `${i.pk.S}|${i.sk.S}`));
@@ -100,6 +106,13 @@ const main = async () => {
     }
     if (!pipeSkipsCopies) {
         report.next = `Refusing --apply: pipe ${pipeName} would announce every copy. Update the ${stack} stack to v2 first.`;
+        print(report);
+        process.exit(1);
+    }
+    if (!(pipeAgeMinutes >= MIN_PIPE_AGE_MINUTES)) {
+        report.next = Number.isNaN(pipeAgeMinutes)
+            ? `Refusing --apply: cannot read when pipe ${pipeName} was last updated (${LastModifiedTime}).`
+            : `Refusing --apply: pipe ${pipeName} was updated ${pipeAgeMinutes} min ago and may still use its old filter. Run again in ${MIN_PIPE_AGE_MINUTES - pipeAgeMinutes} min.`;
         print(report);
         process.exit(1);
     }

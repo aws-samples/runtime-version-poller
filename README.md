@@ -8,7 +8,7 @@ If you run v1 of this sample, follow [Upgrading from v1](#upgrading-from-v1). Re
 
 The core functionality is achieved through a set of Lambda functions, one for each supported runtime and architecture. These functions are triggered hourly via CloudWatch Events and log their runtime version to CloudWatch Logs using the `INIT_START` log line.
 
-CloudWatch Logs is configured with an Account Policy that subscribes to the `INIT_START` log line. Whenever a new log entry is detected, a target function extracts the latest runtime version information and stores it in a DynamoDB table.
+CloudWatch Logs is configured with an Account Policy that subscribes to the `INIT_START` log line. Whenever a new log entry is detected, a target function extracts the latest runtime version information and stores it in a DynamoDB table. The policy covers every function in the account, so `target` reads the architecture from the function name (`<name>_x86_64` or `<name>_arm64`) and ignores functions named any other way.
 
 EventBridge Pipelines monitors the DynamoDB table for new entries (create events). When a new entry is detected, EventBridge Pipelines triggers an SNS notification, alerting subscribers about the availability of a new Lambda runtime version.
 
@@ -97,7 +97,7 @@ Follow these steps to deploy the solution:
 
 3. **Deploy the Account Policy CloudFormation Template**: In each supported region (see Region Support section above), deploy the `accountpolicy` CloudFormation template, which creates subscriptions for all log groups in the region.
 
-4. **Deploy the Function CloudFormation Template**: In each region for every runtime and architecture, deploy the `function` CloudFormation template, which deploys a function, a log group (to limit log retention), and a CloudWatch Event to trigger the function hourly. The function template accepts either the name of an existing function or an S3 location of a Lambda deployment ZIP (e.g. create a blank function using the AWS console, download the deployment ZIP, and upload it to S3). Functions it creates use the role from step 1 (pass `RoleStackName` if you named that stack differently) and carry the tag `runtime-version-poller`. If you pass an existing function in `MyFunctionParameter`, tag it yourself so `update` refreshes it:
+4. **Deploy the Function CloudFormation Template**: In each region for every runtime and architecture, deploy the `function` CloudFormation template, which deploys a function, a log group (to limit log retention), and a CloudWatch Event to trigger the function hourly. The function template accepts either the name of an existing function or an S3 location of a Lambda deployment ZIP (e.g. create a blank function using the AWS console, download the deployment ZIP, and upload it to S3). Functions it creates use the role from step 1 (pass `RoleStackName` if you named that stack differently) and carry the tag `runtime-version-poller`. If you pass an existing function in `MyFunctionParameter`, name it `<name>_x86_64` or `<name>_arm64` with no other `_` (or `target` ignores it), and tag it yourself so `update` refreshes it:
 
    ```
    aws lambda tag-resource --resource <function ARN> --tags runtime-version-poller=function --region <region>
@@ -152,7 +152,7 @@ Run the steps in this order. A step's undo is under it.
    aws cloudformation deploy --stack-name target --template-file target.template.json --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND --region us-east-1
    ```
 
-   From now on `target` writes `x86_64` keys. For a version it already holds under the v1 key, it copies that item instead (with `migratedFrom`), and the pipe does not announce copies, so no version is announced twice. Do this before step 4: under the v1 pipe, every copy the migration makes would be sent to your SNS subscribers.
+   From now on `target` writes `x86_64` keys. For a version it already holds under the v1 key it writes nothing, so no version is announced twice; step 4 moves those items. Do this before step 4: the v2 pipe does not announce the migration's copies (they carry `migratedFrom`), but the v1 pipe would send every one to your SNS subscribers.
    Undo: deploy the v1 `target.template.json` the same way.
 
 4. **Move the x86 history to the new keys:**
@@ -162,7 +162,7 @@ Run the steps in this order. A step's undo is under it.
    node migration/migrate-table.js --apply
    ```
 
-   The first command prints how many items it would copy, how many already exist under the new key (it skips those) and how many v1 items it would delete. With `--apply` it copies each `<runtime>_x86_<region>` item to `<runtime>_x86_64_<region>` with `arch` = `x86_64`, then deletes the original, in one transaction per item. It refuses `--apply` until step 3 is done. Pass `--stack=<name>` if your target stack is not called `target`.
+   The first command prints how many items it would copy, how many already exist under the new key (it skips those) and how many v1 items it would delete. With `--apply` it copies each `<runtime>_x86_<region>` item to `<runtime>_x86_64_<region>` with `arch` = `x86_64`, then deletes the original, in one transaction per item. It refuses `--apply` until step 3 is done and the pipe was last updated at least 5 minutes ago (a pipe keeps its old filter for a short while after an update). Pass `--stack=<name>` if your target stack is not called `target`.
    Undo: restore the backup from step 1.
 
 5. **Only if a function stack passed `MyRoleParameter`:** create a role stack for that role in `us-east-1`, then update those function stacks yourself with the v2 `function.template.json` and `RoleStackName=<that stack>`. Step 6 lists them under `usesMyRoleParameter` and leaves them alone.
