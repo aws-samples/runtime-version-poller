@@ -83,7 +83,7 @@
                         "Arn"
                     ]
                 },
-                "Runtime": "nodejs20.x",
+                "Runtime": "nodejs24.x",
                 "Timeout": 30,
                 "MemorySize": 1769
             }

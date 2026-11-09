@@ -41,11 +41,7 @@
                                     "Effect": "Allow",
                                     "Action": [
                                         "dynamodb:GetItem",
-                                        "dynamodb:PutItem",
-                                        "dynamodb:UpdateItem",
-                                        "dynamodb:DeleteItem",
-                                        "dynamodb:Scan",
-                                        "dynamodb:Query"
+                                        "dynamodb:PutItem"
                                     ],
                                     "Resource": {
                                         "Fn::GetAtt": [
