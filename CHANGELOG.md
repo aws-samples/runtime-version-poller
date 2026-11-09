@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.0.2 (2026-11-09)
+
+- `update` runs on `nodejs24.x`. `nodejs20.x` was deprecated on 30 Apr 2026.
+- `target`'s role may only `GetItem` and `PutItem` on the table, the two calls its code makes. Update the target stack to drop the unused `UpdateItem`, `DeleteItem`, `Scan` and `Query`.
+
 ## v2.0.1 (2026-11-06)
 
 - `target` ignores functions whose name does not end in `_x86_64` or `_arm64`. The account log policy sends it every function's `INIT_START`, and v2.0.0 stored a function with no `_` in its name under an empty arch (`<runtime>__<region>`) and announced it.
