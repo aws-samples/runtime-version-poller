@@ -46,6 +46,7 @@ The following runtime and architecture combinations are currently supported by t
 | nodejs20.x | arm64, x86_64 | ✅ Supported |
 | nodejs22.x | arm64, x86_64 | ✅ Supported |
 | nodejs24.x | arm64, x86_64 | ✅ Supported |
+| nodejs26.x | arm64, x86_64 | 🧪 Preview |
 | python3.8 | arm64, x86_64 | ✅ Supported |
 | python3.9 | arm64, x86_64 | ✅ Supported |
 | python3.10 | arm64, x86_64 | ✅ Supported |
