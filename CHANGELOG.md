@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.0.3 (2026-11-23)
+
+- `target` and `update` run on `nodejs26.x`, the newest GA Node.js runtime (GA 20 Nov 2026). Update the target stack in `us-east-1` and the update stack in each region.
+
 ## v2.0.2 (2026-11-09)
 
 - `update` runs on `nodejs24.x`. `nodejs20.x` was deprecated on 30 Apr 2026.
